@@ -3,7 +3,7 @@
 
 import React, { useMemo } from 'react';
 import Card from '../ui/Card.jsx';
-import { FEATURES, META, getXY } from '../../data/dataset.js';
+import { getDataset, getXY } from '../../data/dataset.js';
 import {
   ResponsiveContainer,
   ScatterChart,
@@ -14,25 +14,47 @@ import {
   Tooltip
 } from 'recharts';
 
-export default function SetupCard({ feature, onFeatureChange }) {
-  const featureObj = FEATURES.find((f) => f.key === feature) || FEATURES[0];
+export default function SetupCard({
+  datasetKey = 'concrete',
+  targetKey = 'strength',
+  feature,
+  onFeatureChange,
+  rawXY
+}) {
+  const activeDs = getDataset(datasetKey);
+  const targetObj =
+    activeDs.TARGETS.find((t) => t.key === targetKey) || activeDs.TARGETS[0];
+  const featureObj =
+    activeDs.FEATURES.find((f) => f.key === feature) || activeDs.FEATURES[0];
 
   const rawData = useMemo(() => {
-    return getXY(feature).map((pt) => ({
+    if (rawXY && rawXY.length > 0) {
+      return rawXY.map((pt) => ({
+        x: Number(pt.x),
+        y: Number(pt.y)
+      }));
+    }
+    return getXY(datasetKey, feature, targetKey).map((pt) => ({
       x: Number(pt.x),
       y: Number(pt.y)
     }));
-  }, [feature]);
+  }, [rawXY, datasetKey, feature, targetKey]);
+
+  const targetUnitDisplay = targetObj.unit ? `(${targetObj.unit})` : '';
+  const featureUnitDisplay = featureObj.unit ? `(${featureObj.unit})` : '';
 
   return (
-    <Card title="Your setup" subtitle="Dataset feature and target baseline">
+    <Card
+      title="Your setup"
+      subtitle={`${activeDs.title}: ${featureObj.label} vs ${targetObj.label}`}
+    >
       <div className="space-y-4">
         {/* Single line description & selector */}
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
           <p className="text-sm font-medium text-slate-700">
-            Predicting strength ({META.targetUnit}) from{' '}
+            Predicting {targetObj.label} {targetUnitDisplay} from{' '}
             <span className="font-bold text-indigo-700">
-              {featureObj.label} ({featureObj.unit})
+              {featureObj.label} {featureUnitDisplay}
             </span>
           </p>
 
@@ -49,16 +71,16 @@ export default function SetupCard({ feature, onFeatureChange }) {
               onChange={(e) => onFeatureChange(e.target.value)}
               className="rounded-xl border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-800 shadow-xs focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100 cursor-pointer"
             >
-              {FEATURES.map((f) => (
+              {activeDs.FEATURES.map((f) => (
                 <option key={f.key} value={f.key}>
-                  {f.label} ({f.unit})
+                  {f.label} {f.unit ? `(${f.unit})` : ''}
                 </option>
               ))}
             </select>
           </div>
         </div>
 
-        {/* Scatter plot of getXY(feature) with small dots and no animation */}
+        {/* Scatter plot of getXY with small dots and no animation */}
         <div className="h-64 w-full rounded-2xl border border-slate-100 bg-slate-50/40 p-2">
           <ResponsiveContainer width="100%" height="100%">
             <ScatterChart margin={{ top: 10, right: 20, bottom: 20, left: 10 }}>
@@ -70,7 +92,7 @@ export default function SetupCard({ feature, onFeatureChange }) {
                 stroke="#64748b"
                 fontSize={11}
                 label={{
-                  value: `${featureObj.label} (${featureObj.unit})`,
+                  value: `${featureObj.label} ${featureUnitDisplay}`.trim(),
                   position: 'insideBottom',
                   offset: -12,
                   fontSize: 11,
@@ -80,11 +102,11 @@ export default function SetupCard({ feature, onFeatureChange }) {
               <YAxis
                 type="number"
                 dataKey="y"
-                name="Strength"
+                name={targetObj.label}
                 stroke="#64748b"
                 fontSize={11}
                 label={{
-                  value: `Strength (${META.targetUnit})`,
+                  value: `${targetObj.label} ${targetUnitDisplay}`.trim(),
                   angle: -90,
                   position: 'insideLeft',
                   offset: 2,
@@ -106,9 +128,9 @@ export default function SetupCard({ feature, onFeatureChange }) {
                           </span>
                         </p>
                         <p className="text-slate-600">
-                          Strength:{' '}
+                          {targetObj.label}:{' '}
                           <span className="font-semibold text-indigo-700">
-                            {Number(pt.y).toFixed(1)} {META.targetUnit}
+                            {Number(pt.y).toFixed(1)} {targetObj.unit}
                           </span>
                         </p>
                       </div>
@@ -118,7 +140,7 @@ export default function SetupCard({ feature, onFeatureChange }) {
                 }}
               />
               <Scatter
-                name="Concrete Samples"
+                name="Samples"
                 data={rawData}
                 fill="#4f46e5"
                 fillOpacity={0.35}

@@ -7,7 +7,7 @@ import Callout from '../components/ui/Callout.jsx';
 import Button from '../components/ui/Button.jsx';
 import Chip from '../components/ui/Chip.jsx';
 import { useLab } from '../store/labStore.js';
-import { FEATURES } from '../data/dataset.js';
+import { getDataset } from '../data/dataset.js';
 
 export default function Observations({ onRestart, onGoToExperiment }) {
   const { runs, quiz } = useLab();
@@ -26,10 +26,39 @@ export default function Observations({ onRestart, onGoToExperiment }) {
     setReflections((prev) => ({ ...prev, [key]: val }));
   };
 
-  // Helper to resolve ingredient display label
-  const getFeatureLabel = (key) => {
-    const f = FEATURES.find((item) => item.key === key);
-    return f ? f.label : key;
+  // Helper to resolve dataset title
+  const getRunDatasetName = (r) => {
+    if (r.datasetName) return r.datasetName;
+    try {
+      const ds = getDataset(r.datasetKey || r.dataset || 'concrete');
+      return ds.title;
+    } catch {
+      return r.datasetKey || 'Concrete';
+    }
+  };
+
+  // Helper to resolve target label
+  const getRunTargetLabel = (r) => {
+    if (r.targetLabel) return r.targetLabel;
+    try {
+      const ds = getDataset(r.datasetKey || r.dataset || 'concrete');
+      const tgt = ds.TARGETS.find((t) => t.key === (r.targetKey || r.target));
+      return tgt ? tgt.label : r.targetKey || 'Target';
+    } catch {
+      return r.targetKey || 'Target';
+    }
+  };
+
+  // Helper to resolve feature label
+  const getRunFeatureLabel = (r) => {
+    if (r.featureLabel) return r.featureLabel;
+    try {
+      const ds = getDataset(r.datasetKey || r.dataset || 'concrete');
+      const f = ds.FEATURES.find((item) => item.key === r.feature);
+      return f ? f.label : r.feature;
+    } catch {
+      return r.feature;
+    }
   };
 
   // Helper to map behavior string to Chip color
@@ -63,14 +92,17 @@ export default function Observations({ onRestart, onGoToExperiment }) {
     let fastestText = '';
     if (convergedRuns.length > 0) {
       const fastest = [...convergedRuns].sort((a, b) => a.itersUsed - b.itersUsed)[0];
-      fastestText = `Learning rate α = ${fastest.lr} converged fastest, reaching the minimum error in just ${fastest.itersUsed} iteration${fastest.itersUsed === 1 ? '' : 's'} on ${getFeatureLabel(fastest.feature)}.`;
+      const dsTitle = getRunDatasetName(fastest);
+      const featName = getRunFeatureLabel(fastest);
+      const tgtName = getRunTargetLabel(fastest);
+      fastestText = `Learning rate α = ${fastest.lr} converged fastest, reaching the minimum error in just ${fastest.itersUsed} iteration${fastest.itersUsed === 1 ? '' : 's'} on ${featName} predicting ${tgtName} (${dsTitle}).`;
     } else {
       fastestText =
         'None of the tested learning rates reached the convergence tolerance before reaching their iteration limit.';
     }
 
     // 2. Which behaviours appeared
-    const uniqueBehaviors = [...new Set(runs.map((r) => r.behavior))];
+    const uniqueBehaviors = [...new Set(runs.map((r) => r.behavior || r.behaviour))].filter(Boolean);
     let behaviorsText = '';
     if (uniqueBehaviors.length > 0) {
       behaviorsText = `Across your experimental runs, the following optimization behaviors were observed: ${uniqueBehaviors.join(', ')}.`;
@@ -95,8 +127,11 @@ export default function Observations({ onRestart, onGoToExperiment }) {
         ((bestRun.finalLoss - bestRun.closedFormLoss) / bestRun.closedFormLoss) * 100
       );
       const gapDisplay = gapPct <= 0.005 ? '0.00%' : `${gapPct.toFixed(2)}%`;
+      const dsTitle = getRunDatasetName(bestRun);
+      const featName = getRunFeatureLabel(bestRun);
+      const tgtName = getRunTargetLabel(bestRun);
 
-      accuracyText = `The closest run (α = ${bestRun.lr}) reached an MSE loss of ${bestRun.finalLoss.toFixed(6)}, which matches the analytical closed-form baseline of ${bestRun.closedFormLoss.toFixed(6)} within ${gapDisplay}.`;
+      accuracyText = `The closest run (α = ${bestRun.lr} on ${featName} → ${tgtName} in ${dsTitle}) reached an MSE loss of ${bestRun.finalLoss.toFixed(6)}, which matches the analytical closed-form baseline of ${bestRun.closedFormLoss.toFixed(6)} within ${gapDisplay}.`;
     } else {
       accuracyText =
         'The best performing gradient descent runs iteratively approached the least-squares regression line.';
@@ -109,11 +144,12 @@ export default function Observations({ onRestart, onGoToExperiment }) {
     };
   }, [runs]);
 
-  // Default pre-filled conclusion based on findings
+  // Default pre-filled conclusion based on findings and datasets tested
   const defaultConclusion = useMemo(() => {
     if (!findings.fastest) return '';
-    return `In this laboratory session, we implemented Batch Gradient Descent for Simple Linear Regression on the UCI Concrete Compressive Strength dataset. ${findings.fastest} ${findings.behaviors} Furthermore, ${findings.accuracy.charAt(0).toLowerCase() + findings.accuracy.slice(1)} These results verify that gradient descent successfully minimizes the Mean Squared Error cost surface to recover the exact least-squares best-fit parameters.`;
-  }, [findings]);
+    const uniqueDatasets = [...new Set(runs.map((r) => getRunDatasetName(r)))].join(' and ');
+    return `In this laboratory session, we implemented Batch Gradient Descent for Simple Linear Regression on the UCI ${uniqueDatasets} dataset. ${findings.fastest} ${findings.behaviors} Furthermore, ${findings.accuracy.charAt(0).toLowerCase() + findings.accuracy.slice(1)} These results verify that gradient descent successfully minimizes the Mean Squared Error cost surface to recover the exact least-squares best-fit parameters across quantitative engineering domains.`;
+  }, [findings, runs]);
 
   // Editable conclusion paragraph state
   const [conclusion, setConclusion] = useState('');
@@ -159,11 +195,13 @@ export default function Observations({ onRestart, onGoToExperiment }) {
     // Observation Table text
     let tableSection = 'OBSERVATION TABLE:\n';
     tableSection +=
-      'Ingredient | Learning Rate (α) | Iterations | Final Loss (MSE) | Behaviour | Gap from Closed-Form\n';
+      'Dataset | Target | Feature | Learning Rate (α) | Iterations | Final Loss (MSE) | Behaviour | Gap from Closed-Form\n';
     tableSection +=
-      '--------------------------------------------------------------------------------------------------------\n';
+      '---------------------------------------------------------------------------------------------------------------------------------\n';
     runs.forEach((r) => {
-      const feat = getFeatureLabel(r.feature);
+      const ds = getRunDatasetName(r);
+      const tgt = getRunTargetLabel(r);
+      const feat = getRunFeatureLabel(r);
       const iters = `${r.itersUsed} / ${r.maxIters}`;
       const loss = Number.isFinite(r.finalLoss) ? r.finalLoss.toFixed(6) : 'Exploded (> 1e6)';
       const gap =
@@ -174,7 +212,7 @@ export default function Observations({ onRestart, onGoToExperiment }) {
             ? '+0.00%'
             : `+${(((r.finalLoss - r.closedFormLoss) / r.closedFormLoss) * 100).toFixed(2)}%`
           : '—';
-      tableSection += `${feat} | α = ${r.lr} | ${iters} | ${loss} | ${r.behavior} | ${gap}\n`;
+      tableSection += `${ds} | ${tgt} | ${feat} | α = ${r.lr} | ${iters} | ${loss} | ${r.behavior || r.behaviour} | ${gap}\n`;
     });
     tableSection += '\n';
 
@@ -328,7 +366,9 @@ export default function Observations({ onRestart, onGoToExperiment }) {
           <table className="w-full text-left text-xs text-slate-700">
             <thead className="border-b border-slate-200 bg-slate-50 text-[11px] font-bold uppercase tracking-wider text-slate-500">
               <tr>
-                <th className="py-3 px-3.5">Ingredient (Feature)</th>
+                <th className="py-3 px-3.5">Dataset</th>
+                <th className="py-3 px-3.5">Target</th>
+                <th className="py-3 px-3.5">Feature</th>
                 <th className="py-3 px-3.5">Learning Rate (α)</th>
                 <th className="py-3 px-3.5">Iterations Used</th>
                 <th className="py-3 px-3.5">Final Loss (MSE)</th>
@@ -366,13 +406,23 @@ export default function Observations({ onRestart, onGoToExperiment }) {
                   }
                 }
 
+                const dsTitle = getRunDatasetName(r);
+                const tgtLabel = getRunTargetLabel(r);
+                const featLabel = getRunFeatureLabel(r);
+
                 return (
                   <tr
-                    key={`${r.feature}-${r.lr}-${r.maxIters}-${idx}`}
+                    key={`${r.datasetKey || 'concrete'}-${r.targetKey || 'strength'}-${r.feature}-${r.lr}-${r.maxIters}-${idx}`}
                     className="hover:bg-slate-50/70 transition-colors"
                   >
-                    <td className="py-2.5 px-3.5 font-medium text-slate-900">
-                      {getFeatureLabel(r.feature)}
+                    <td className="py-2.5 px-3.5 font-medium text-slate-800 whitespace-nowrap">
+                      {dsTitle}
+                    </td>
+                    <td className="py-2.5 px-3.5 text-teal-700 font-semibold whitespace-nowrap">
+                      {tgtLabel}
+                    </td>
+                    <td className="py-2.5 px-3.5 font-medium text-slate-900 whitespace-nowrap">
+                      {featLabel}
                     </td>
                     <td className="py-2.5 px-3.5 font-mono font-bold text-indigo-700">
                       α = {r.lr}
@@ -382,7 +432,9 @@ export default function Observations({ onRestart, onGoToExperiment }) {
                     </td>
                     <td className="py-2.5 px-3.5 font-mono">{lossDisplay}</td>
                     <td className="py-2.5 px-3.5">
-                      <Chip color={getBehaviorColor(r.behavior)}>{r.behavior}</Chip>
+                      <Chip color={getBehaviorColor(r.behavior || r.behaviour)}>
+                        {r.behavior || r.behaviour}
+                      </Chip>
                     </td>
                     <td className={`py-2.5 px-3.5 font-mono ${gapColor}`}>{gapText}</td>
                   </tr>

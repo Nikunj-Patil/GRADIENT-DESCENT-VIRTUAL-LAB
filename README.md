@@ -1,6 +1,6 @@
 # Gradient Descent Virtual Lab
 
-An interactive, educational single-page web application designed for second-year engineering students exploring Batch Gradient Descent for simple linear regression ($y = w \cdot x + b$, MSE loss) on the UCI Concrete Compressive Strength dataset.
+An interactive, educational single-page web application designed for engineering students exploring Batch Gradient Descent for simple linear regression ($y = w \cdot x + b$, MSE loss) across real-world benchmark datasets: UCI Concrete Compressive Strength and UCI Energy Efficiency.
 
 ---
 
@@ -58,7 +58,8 @@ node scripts/test-gd.mjs
 | `src/components/experiment/PerformanceReportCard.jsx` | Benchmark table against closed-form baseline and three 'Try this' challenge chips |
 | `src/components/experiment/RunsTable.jsx` | Session runs history table |
 | `src/data/concrete.json` | UCI Concrete Compressive Strength dataset (1,030 mix samples) |
-| `src/data/dataset.js` | Dataset module (`META`, `FEATURES`, `DATA`, `DEFAULT_FEATURE`, `getXY`, `correlations`) |
+| `src/data/energy.json` | UCI Energy Efficiency dataset (768 building simulation samples) |
+| `src/data/dataset.js` | Multi-dataset registry (`DATASETS`, `getDataset`, `getXY`, `correlations`, `getDatasetStats`) |
 | `src/data/quizzes.js` | Quiz definitions for pre-test, mini-quizzes, and final assessment |
 | `src/lib/gd.js` | Pure mathematical gradient descent engine, analytical closed-form, and scale transformations |
 | `src/pages/Aim.jsx` | Step 1: Hiker story, lab aim, roadmap, and dataset attribution |

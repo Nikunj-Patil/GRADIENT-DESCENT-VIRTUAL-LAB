@@ -5,7 +5,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import Card from '../ui/Card.jsx';
 import Button from '../ui/Button.jsx';
 import Chip from '../ui/Chip.jsx';
-import { FEATURES, META } from '../../data/dataset.js';
+import { getDataset } from '../../data/dataset.js';
 import { toOriginalScale } from '../../lib/gd.js';
 import {
   ResponsiveContainer,
@@ -23,10 +23,19 @@ import {
 export default function WatchItLearnCard({
   rawXY,
   feature,
+  datasetKey = 'concrete',
+  targetKey = 'strength',
   runResult,
   closedFormLoss
 }) {
-  const featureObj = FEATURES.find((f) => f.key === feature) || FEATURES[0];
+  const activeDs = getDataset(datasetKey);
+  const targetObj =
+    activeDs.TARGETS.find((t) => t.key === targetKey) || activeDs.TARGETS[0];
+  const featureObj =
+    activeDs.FEATURES.find((f) => f.key === feature) || activeDs.FEATURES[0];
+
+  const targetUnitDisplay = targetObj.unit ? `(${targetObj.unit})` : '';
+  const featureUnitDisplay = featureObj.unit ? `(${featureObj.unit})` : '';
 
   const history = runResult?.history || [];
   const final = runResult?.final;
@@ -237,7 +246,7 @@ export default function WatchItLearnCard({
                     stroke="#64748b"
                     fontSize={11}
                     label={{
-                      value: `${featureObj.label} (${featureObj.unit})`,
+                      value: `${featureObj.label} ${featureUnitDisplay}`.trim(),
                       position: 'insideBottom',
                       offset: -10,
                       fontSize: 10,
@@ -247,12 +256,12 @@ export default function WatchItLearnCard({
                   <YAxis
                     type="number"
                     dataKey="y"
-                    name="Strength"
+                    name={targetObj.label}
                     domain={[0, Math.ceil(maxY * 1.05)]}
                     stroke="#64748b"
                     fontSize={11}
                     label={{
-                      value: `Strength (${META.targetUnit})`,
+                      value: `${targetObj.label} ${targetUnitDisplay}`.trim(),
                       angle: -90,
                       position: 'insideLeft',
                       offset: 5,
@@ -271,7 +280,7 @@ export default function WatchItLearnCard({
                               {featureObj.label}: {Number(pt.x).toFixed(1)} {featureObj.unit}
                             </p>
                             <p className="text-slate-600">
-                              Strength: {Number(pt.y).toFixed(1)} {META.targetUnit}
+                              {targetObj.label}: {Number(pt.y).toFixed(1)} {targetObj.unit}
                             </p>
                           </div>
                         );

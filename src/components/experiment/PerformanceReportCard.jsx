@@ -8,17 +8,31 @@ import Card from '../ui/Card.jsx';
 import Chip from '../ui/Chip.jsx';
 import Button from '../ui/Button.jsx';
 import { useLab } from '../../store/labStore.js';
+import { getDataset } from '../../data/dataset.js';
 
 export default function PerformanceReportCard({
   feature,
+  datasetKey = 'concrete',
+  targetKey = 'strength',
   closedFormLoss,
   onSelectChallenge
 }) {
   const { runs, clearRuns } = useLab();
   const [selectedChallengeId, setSelectedChallengeId] = useState(null);
 
-  // Filter runs for the active feature
-  const featureRuns = runs.filter((r) => r.feature === feature);
+  const activeDs = getDataset(datasetKey);
+  const targetObj =
+    activeDs.TARGETS.find((t) => t.key === targetKey) || activeDs.TARGETS[0];
+  const featureObj =
+    activeDs.FEATURES.find((f) => f.key === feature) || activeDs.FEATURES[0];
+
+  // Filter runs for the active dataset, target, and feature
+  const featureRuns = runs.filter(
+    (r) =>
+      (r.datasetKey || r.dataset || 'concrete') === datasetKey &&
+      (r.targetKey || r.target || 'strength') === targetKey &&
+      r.feature === feature
+  );
 
   // Sort runs by learning rate for clean presentation
   const sortedRuns = [...featureRuns].sort((a, b) => a.lr - b.lr);
@@ -74,7 +88,7 @@ export default function PerformanceReportCard({
   return (
     <Card
       title="Performance report"
-      subtitle="Quantitative metrics and gap comparison against the exact closed-form solution"
+      subtitle={`Quantitative metrics and gap comparison for ${featureObj.label} → ${targetObj.label} (${activeDs.title})`}
       action={
         sortedRuns.length > 0 && (
           <Button variant="ghost" size="sm" onClick={clearRuns} className="text-xs py-1 px-2.5">
@@ -125,7 +139,7 @@ export default function PerformanceReportCard({
               {sortedRuns.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="py-6 text-center text-slate-400">
-                    No runs recorded yet for this feature. Run an experiment or race the step sizes above!
+                    No runs recorded yet for {featureObj.label} → {targetObj.label}. Run an experiment or race the step sizes above!
                   </td>
                 </tr>
               ) : (

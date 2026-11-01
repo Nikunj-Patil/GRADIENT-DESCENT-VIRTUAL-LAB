@@ -7,6 +7,7 @@ import React, { useState, useMemo } from 'react';
 import Card from '../ui/Card.jsx';
 import Button from '../ui/Button.jsx';
 import Chip from '../ui/Chip.jsx';
+import { getDataset } from '../../data/dataset.js';
 import {
   ResponsiveContainer,
   LineChart,
@@ -21,6 +22,8 @@ import {
 
 export default function RaceStepSizesCard({
   feature,
+  datasetKey = 'concrete',
+  targetKey = 'strength',
   maxIters,
   onRace,
   isRacing,
@@ -28,6 +31,11 @@ export default function RaceStepSizesCard({
   closedFormLoss
 }) {
   const [isLogScale, setIsLogScale] = useState(false);
+  const activeDs = getDataset(datasetKey);
+  const targetObj =
+    activeDs.TARGETS.find((t) => t.key === targetKey) || activeDs.TARGETS[0];
+  const featureObj =
+    activeDs.FEATURES.find((f) => f.key === feature) || activeDs.FEATURES[0];
 
   // Ceil cap for diverged loss to prevent squashing the chart
   const LOSS_CAP = 2.5;
@@ -97,7 +105,7 @@ export default function RaceStepSizesCard({
       data.push(entry);
     }
 
-    const calculatedMin = Math.max(0.5, Math.floor(minObservedLoss * 10) / 10);
+    const calculatedMin = Math.max(0, Math.floor((minObservedLoss - 0.05) * 10) / 10);
     return {
       chartData: data,
       minY: calculatedMin,
@@ -108,7 +116,7 @@ export default function RaceStepSizesCard({
   return (
     <Card
       title="Race the step sizes"
-      subtitle={`Compare all 4 learning rates simultaneously at ${maxIters} max iterations`}
+      subtitle={`Compare all 4 learning rates simultaneously for ${featureObj.label} → ${targetObj.label} at ${maxIters} max iterations`}
       action={
         <div className="flex flex-wrap items-center gap-2">
           {/* Log-scale Toggle */}

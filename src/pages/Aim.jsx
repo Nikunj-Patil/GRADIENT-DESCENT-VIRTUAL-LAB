@@ -23,7 +23,7 @@ export default function Aim({ onStart }) {
     {
       num: '3',
       title: 'Run on Real Data',
-      desc: 'Apply batch gradient descent to real laboratory concrete tests to fit a predictive line.'
+      desc: 'Apply batch gradient descent to real engineering datasets (Concrete or Energy Efficiency) to fit a predictive line.'
     },
     {
       num: '4',
@@ -94,13 +94,14 @@ export default function Aim({ onStart }) {
       </Card>
 
       {/* Dataset Introduction */}
-      <Card title="The Dataset" subtitle="Real engineering laboratory data">
+      <Card title="The Datasets" subtitle="Real engineering benchmark data">
         <div className="space-y-3 text-sm text-slate-700">
           <p>
-            You will work with the <strong>{META.title}</strong>, sourced from the <strong>{META.source}</strong>.
+            You will explore real engineering benchmarks from the UCI Machine Learning Repository:
+            <strong> Concrete Compressive Strength</strong> (civil engineering recipes) and <strong>Energy Efficiency</strong> (building thermal dynamics).
           </p>
           <Callout variant="tip" title="Step 4 Guided Tour">
-            In <strong>Step 4 (Dataset exploration)</strong>, you will take an interactive guided tour of all 1,030 concrete mixes. You will explore the 8 physical ingredients—including cement, water, and blast furnace slag—and see how each relates to compressive strength.
+            In <strong>Step 4 (Dataset exploration)</strong>, you will choose your engineering domain, explore its 8 input features, and see how physical parameters relate to compressive strength, heating load, or cooling load.
           </Callout>
         </div>
       </Card>

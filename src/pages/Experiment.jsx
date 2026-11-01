@@ -10,7 +10,7 @@ import RaceStepSizesCard from '../components/experiment/RaceStepSizesCard.jsx';
 import PerformanceReportCard from '../components/experiment/PerformanceReportCard.jsx';
 import Button from '../components/ui/Button.jsx';
 import { useLab } from '../store/labStore.js';
-import { getXY, FEATURES } from '../data/dataset.js';
+import { getXY, getDataset } from '../data/dataset.js';
 import {
   runGD,
   closedForm,
@@ -19,7 +19,23 @@ import {
 } from '../lib/gd.js';
 
 export default function Experiment({ onNext }) {
-  const { feature, setFeature, addRun } = useLab();
+  const {
+    datasetKey = 'concrete',
+    targetKey = 'strength',
+    feature,
+    setFeature,
+    addRun
+  } = useLab();
+
+  // Active dataset and target descriptors
+  const activeDatasetKey = datasetKey || 'concrete';
+  const activeDs = getDataset(activeDatasetKey);
+  const activeTargetKey = targetKey || activeDs.DEFAULT_TARGET;
+  const targetObj =
+    activeDs.TARGETS.find((t) => t.key === activeTargetKey) || activeDs.TARGETS[0];
+  const activeFeatureKey = feature || activeDs.DEFAULT_FEATURE;
+  const featureObj =
+    activeDs.FEATURES.find((f) => f.key === activeFeatureKey) || activeDs.FEATURES[0];
 
   // Hyperparameter state (default starts with SUGGESTED_LRS.good)
   const [lr, setLr] = useState(SUGGESTED_LRS.good);
@@ -34,8 +50,10 @@ export default function Experiment({ onNext }) {
   const [raceResults, setRaceResults] = useState(null);
   const [isRacing, setIsRacing] = useState(false);
 
-  // Raw XY data for currently selected feature
-  const rawXY = useMemo(() => getXY(feature), [feature]);
+  // Raw XY data for currently selected dataset, feature and target
+  const rawXY = useMemo(() => {
+    return getXY(activeDatasetKey, activeFeatureKey, activeTargetKey);
+  }, [activeDatasetKey, activeFeatureKey, activeTargetKey]);
 
   // Analytical closed-form baseline in standardized space
   const cfBaseline = useMemo(() => closedForm(rawXY), [rawXY]);
@@ -51,21 +69,32 @@ export default function Experiment({ onNext }) {
       setBehavior(classifiedBehavior);
       setIsRunning(false);
 
-      // Section 5: Save completed run with addRun using spec shape
+      // Save completed run with extended multi-dataset metadata
       addRun({
-        feature,
+        datasetKey: activeDatasetKey,
+        datasetName: activeDs.title,
+        targetKey: activeTargetKey,
+        targetLabel: targetObj.label,
+        targetUnit: targetObj.unit,
+        feature: activeFeatureKey,
+        featureLabel: featureObj.label,
+        featureUnit: featureObj.unit,
         lr,
+        learningRate: lr,
         maxIters,
         itersUsed: res.final.iters,
+        iterations: res.final.iters,
         converged: res.final.converged,
         diverged: res.final.diverged,
         finalLoss: res.final.loss,
         closedFormLoss: cfBaseline.loss,
         timeMs: res.timeMs,
-        behavior: classifiedBehavior
+        executionTime: res.timeMs,
+        behavior: classifiedBehavior,
+        behaviour: classifiedBehavior
       });
     }, 20);
-  }, [rawXY, lr, maxIters, feature, addRun, cfBaseline]);
+  }, [rawXY, lr, maxIters, activeDatasetKey, activeTargetKey, activeFeatureKey, activeDs.title, targetObj, featureObj, addRun, cfBaseline]);
 
   // Race the 4 step sizes and save each through addRun
   const handleRace = useCallback(() => {
@@ -80,25 +109,36 @@ export default function Experiment({ onNext }) {
         const beh = classifyRun(res.history, res.final);
         results[key] = res;
 
-        // Requirement 4: Every race run is saved through addRun (the store replaces duplicates)
+        // Every race run is saved through addRun
         addRun({
-          feature,
+          datasetKey: activeDatasetKey,
+          datasetName: activeDs.title,
+          targetKey: activeTargetKey,
+          targetLabel: targetObj.label,
+          targetUnit: targetObj.unit,
+          feature: activeFeatureKey,
+          featureLabel: featureObj.label,
+          featureUnit: featureObj.unit,
           lr: raceLr,
+          learningRate: raceLr,
           maxIters,
           itersUsed: res.final.iters,
+          iterations: res.final.iters,
           converged: res.final.converged,
           diverged: res.final.diverged,
           finalLoss: res.final.loss,
           closedFormLoss: cfBaseline.loss,
           timeMs: res.timeMs,
-          behavior: beh
+          executionTime: res.timeMs,
+          behavior: beh,
+          behaviour: beh
         });
       });
 
       setRaceResults(results);
       setIsRacing(false);
     }, 20);
-  }, [rawXY, maxIters, feature, addRun, cfBaseline]);
+  }, [rawXY, maxIters, activeDatasetKey, activeTargetKey, activeFeatureKey, activeDs.title, targetObj, featureObj, addRun, cfBaseline]);
 
   // Pre-fill controls when a challenge chip is clicked
   const handleSelectChallenge = (ch) => {
@@ -118,17 +158,26 @@ export default function Experiment({ onNext }) {
     setBehavior(null);
   };
 
-  // Run automatically on first mount or when feature changes
+  // Run automatically on first mount or when dataset, target, or feature changes
   useEffect(() => {
     executeRun();
     setRaceResults(null);
-  }, [feature]);
+  }, [activeDatasetKey, activeTargetKey, activeFeatureKey]);
 
   return (
     <div className="space-y-6">
       {/* Page Header */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-xs font-semibold px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-100">
+              {activeDs.title}
+            </span>
+            <span className="text-xs text-slate-400">•</span>
+            <span className="text-xs font-semibold px-2 py-0.5 rounded-md bg-teal-50 text-teal-700 border border-teal-100">
+              Predicting {targetObj.label} {targetObj.unit ? `(${targetObj.unit})` : ''}
+            </span>
+          </div>
           <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">
             Experiment Workbench
           </h2>
@@ -146,8 +195,11 @@ export default function Experiment({ onNext }) {
 
       {/* Section 1: 'Your setup' */}
       <SetupCard
-        feature={feature}
+        datasetKey={activeDatasetKey}
+        targetKey={activeTargetKey}
+        feature={activeFeatureKey}
         onFeatureChange={setFeature}
+        rawXY={rawXY}
       />
 
       {/* Section 2: 'Set your step size' */}
@@ -164,7 +216,9 @@ export default function Experiment({ onNext }) {
       {/* Section 3: 'Watch it learn' */}
       <WatchItLearnCard
         rawXY={rawXY}
-        feature={feature}
+        feature={activeFeatureKey}
+        datasetKey={activeDatasetKey}
+        targetKey={activeTargetKey}
         runResult={runResult}
         closedFormLoss={cfBaseline.loss}
       />
@@ -178,7 +232,9 @@ export default function Experiment({ onNext }) {
 
       {/* Section 5: 'Race the step sizes' */}
       <RaceStepSizesCard
-        feature={feature}
+        feature={activeFeatureKey}
+        datasetKey={activeDatasetKey}
+        targetKey={activeTargetKey}
         maxIters={maxIters}
         onRace={handleRace}
         isRacing={isRacing}
@@ -188,7 +244,9 @@ export default function Experiment({ onNext }) {
 
       {/* Section 6: 'Performance report' */}
       <PerformanceReportCard
-        feature={feature}
+        feature={activeFeatureKey}
+        datasetKey={activeDatasetKey}
+        targetKey={activeTargetKey}
         closedFormLoss={cfBaseline.loss}
         onSelectChallenge={handleSelectChallenge}
       />
